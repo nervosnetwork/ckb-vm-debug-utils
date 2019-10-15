@@ -145,7 +145,6 @@ impl<'a> Handler for VMHandler<'a> {
             VCont::Continue => {
                 self.machine.borrow_mut().step(&decoder).expect("VM error");
                 while !self.at_breakpoint() {
-                    println!("PC: {:x}", self.machine.borrow().pc());
                     self.machine.borrow_mut().step(&decoder).expect("VM error");
                 }
             }
