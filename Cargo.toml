@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 byteorder = "1"
 bytes = "0.4.12"
-ckb-vm = { path = "../ckb-vm" }
+ckb-vm = { git = "https://github.com/nervosnetwork/ckb-vm", rev = "44adc76" }
 env_logger = "0.4.3"
 gdb-remote-protocol = { git = "https://github.com/luser/rust-gdb-remote-protocol", rev = "565ab0c" }
 log = "0.4.0"
