@@ -28,7 +28,7 @@ int power(int base, int n) {
 $ git clone https://github.com/nervosnetwork/ckb-vm-gdbserver
 $ cd ckb-vm-gdbserver
 $ cargo build
-$ riscv64-unknown-elf-gcc -g program.c -o program
+$ riscv64-unknown-elf-gcc -g ../program.c -o program
 $ ./target/debug/ckb-vm-gdbserver 0.0.0.0:2000 program
 ```
 
