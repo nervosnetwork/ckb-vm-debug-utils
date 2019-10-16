@@ -1,10 +1,13 @@
-# ckb-vm-gdbserver
+# ckb-vm-debug-utils
 
-This projects add initial GDB support for CKB VM.
+Utilities aiding CKB VM debug, including the following components:
 
-Notice for now this only has bare metal CKB VM support, no CKB syscalls are supported in the debugger. Later we might add those.
+* gdb remote debugging support
+* standard IO components, so you can debug with printf as you wish
 
 # How to use it
+
+While this library contains components to plugin to your CKB VM runtime, we also prepare a bare metal binary showcasing how to use the components. Notice for now this binary only runs simple RISC-V programs, it doesn't support syscalls used in CKB. Later we might combine this with [ckb-standalone-debugger](https://github.com/nervosnetwork/ckb-standalone-debugger) to create a unified debugging experience for CKB.
 
 ```bash
 $ cat program.c
@@ -25,17 +28,17 @@ int power(int base, int n) {
   for (i = 1; i <= n; i++) p = p * base;
   return p;
 }
-$ git clone https://github.com/nervosnetwork/ckb-vm-gdbserver
-$ cd ckb-vm-gdbserver
+$ git clone https://github.com/nervosnetwork/ckb-vm-debug-utils
+$ cd ckb-vm-debug-utils
 $ cargo build
 $ riscv64-unknown-elf-gcc -g ../program.c -o program
-$ ./target/debug/ckb-vm-gdbserver 0.0.0.0:2000 program
+$ ./target/debug/baremetal 0.0.0.0:2000 program
 ```
 
 Now CKB VM's debug server has been started, in a different terminal, we can launch gdb:
 
 ```bash
-$ cd ckb-vm-gdbserver
+$ cd ckb-vm-debug-utils
 $ gdb program
 (gdb) target remote localhost:2000
 Remote debugging using localhost:2000
