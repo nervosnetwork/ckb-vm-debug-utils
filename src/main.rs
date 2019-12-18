@@ -2,7 +2,10 @@
 extern crate log;
 
 use bytes::Bytes;
-use ckb_vm::{DefaultMachineBuilder, SupportMachine};
+use ckb_vm::{
+    machine::asm::{AsmCoreMachine, AsmMachine},
+    DefaultMachineBuilder, SupportMachine,
+};
 use ckb_vm_debug_utils::{GdbHandler, Stdio};
 use gdb_remote_protocol::process_packets_from;
 use std::env;
@@ -26,13 +29,14 @@ fn main() {
     for res in listener.incoming() {
         debug!("Got connection");
         if let Ok(stream) = res {
-            let mut machine = DefaultMachineBuilder::default()
+            let core = DefaultMachineBuilder::<Box<AsmCoreMachine>>::default()
                 .syscall(Box::new(Stdio::new(true)))
                 .build();
+            let mut machine = AsmMachine::new(core, None);
             machine
                 .load_program(&program, &program_args)
                 .expect("load program");
-            machine.set_running(true);
+            machine.machine.set_running(true);
             let h = GdbHandler::new(machine);
             process_packets_from(stream.try_clone().unwrap(), stream, h);
         }
