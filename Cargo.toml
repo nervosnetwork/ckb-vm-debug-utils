@@ -14,7 +14,7 @@ path = "src/main.rs"
 [dependencies]
 byteorder = "1"
 bytes = "0.4.12"
-ckb-vm = { git = "https://github.com/xxuejie/ckb-vm", rev = "df6166c", features = ["detect-asm"] }
+ckb-vm = { git = "https://github.com/nervosnetwork/ckb-vm", rev = "b213522", features = ["detect-asm"] }
 env_logger = "0.4.3"
 gdb-remote-protocol = { git = "https://github.com/luser/rust-gdb-remote-protocol", rev = "565ab0c" }
 libc = "0.2.47"
