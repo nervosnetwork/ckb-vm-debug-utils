@@ -72,13 +72,13 @@ impl Stdio {
             }
         };
         let mut abi_stat = AbiStat::default();
-        abi_stat.dev = stat.st_dev;
+        abi_stat.dev = stat.st_dev as u64;
         abi_stat.ino = stat.st_ino;
-        abi_stat.mode = stat.st_mode;
+        abi_stat.mode = stat.st_mode as u32;
         abi_stat.nlink = stat.st_nlink as i32;
         abi_stat.uid = stat.st_uid;
         abi_stat.gid = stat.st_gid;
-        abi_stat.rdev = stat.st_rdev;
+        abi_stat.rdev = stat.st_rdev as u64;
         abi_stat.size = stat.st_size;
         abi_stat.blksize = stat.st_blksize as i32;
         abi_stat.blocks = stat.st_blocks;
