@@ -4,7 +4,7 @@ extern crate log;
 use bytes::Bytes;
 use ckb_vm::{
     machine::asm::{AsmCoreMachine, AsmMachine},
-    DefaultMachineBuilder, SupportMachine,
+    DefaultMachineBuilder, SupportMachine, ISA_B, ISA_IMC, ISA_MOP,
 };
 use ckb_vm_debug_utils::{GdbHandler, Stdio};
 use gdb_remote_protocol::process_packets_from;
@@ -29,7 +29,8 @@ fn main() {
     for res in listener.incoming() {
         debug!("Got connection");
         if let Ok(stream) = res {
-            let core = DefaultMachineBuilder::<Box<AsmCoreMachine>>::default()
+            let asm_core = AsmCoreMachine::new(ISA_IMC | ISA_B | ISA_MOP, 1, u64::max_value());
+            let core = DefaultMachineBuilder::<Box<AsmCoreMachine>>::new(asm_core)
                 .syscall(Box::new(Stdio::new(true)))
                 .build();
             let mut machine = AsmMachine::new(core, None);
