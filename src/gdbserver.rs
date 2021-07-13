@@ -1,6 +1,6 @@
 use byteorder::{ByteOrder, LittleEndian};
 use ckb_vm::{
-    decoder::build_imac_decoder, machine::asm::AsmMachine, CoreMachine, Memory, SupportMachine,
+    decoder::build_decoder, machine::asm::AsmMachine, CoreMachine, Memory, SupportMachine,
     RISCV_GENERAL_REGISTER_NUMBER,
 };
 use gdb_remote_protocol::{
@@ -86,7 +86,8 @@ impl<'a> Handler for GdbHandler<'a> {
                 .set_register(register, value);
             Ok(())
         } else if register == RISCV_GENERAL_REGISTER_NUMBER {
-            self.machine.borrow_mut().machine.set_pc(value);
+            self.machine.borrow_mut().machine.update_pc(value);
+            self.machine.borrow_mut().machine.commit_pc();
             Ok(())
         } else {
             Err(Error::Error(2))
@@ -142,7 +143,7 @@ impl<'a> Handler for GdbHandler<'a> {
     }
 
     fn vcont(&self, request: Vec<(VCont, Option<ThreadId>)>) -> Result<StopReason, Error> {
-        let decoder = build_imac_decoder::<u64>();
+        let decoder = build_decoder::<u64>(self.machine.borrow().machine.isa());
         let (vcont, _thread_id) = &request[0];
         match vcont {
             VCont::Continue => {
