@@ -1,7 +1,7 @@
 use byteorder::{ByteOrder, LittleEndian};
 use ckb_vm::{
-    decoder::build_decoder, machine::asm::AsmMachine, CoreMachine, Memory, SupportMachine, ISA_B,
-    ISA_IMC, ISA_MOP, RISCV_GENERAL_REGISTER_NUMBER,
+    decoder::build_decoder, machine::asm::AsmMachine, CoreMachine, Memory, SupportMachine,
+    RISCV_GENERAL_REGISTER_NUMBER,
 };
 use gdb_remote_protocol::{
     Breakpoint, Error, Handler, MemoryRegion, ProcessType, StopReason, ThreadId, VCont,
@@ -143,7 +143,7 @@ impl<'a> Handler for GdbHandler<'a> {
     }
 
     fn vcont(&self, request: Vec<(VCont, Option<ThreadId>)>) -> Result<StopReason, Error> {
-        let decoder = build_decoder::<u64>(ISA_IMC | ISA_B | ISA_MOP);
+        let decoder = build_decoder::<u64>(self.machine.borrow().machine.isa());
         let (vcont, _thread_id) = &request[0];
         match vcont {
             VCont::Continue => {

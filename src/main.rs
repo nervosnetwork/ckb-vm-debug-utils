@@ -29,6 +29,7 @@ fn main() {
     for res in listener.incoming() {
         debug!("Got connection");
         if let Ok(stream) = res {
+            // TODO: vm version and isa should be configurable in the future.
             let asm_core = AsmCoreMachine::new(ISA_IMC | ISA_B | ISA_MOP, 1, u64::max_value());
             let core = DefaultMachineBuilder::<Box<AsmCoreMachine>>::new(asm_core)
                 .syscall(Box::new(Stdio::new(true)))
