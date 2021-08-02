@@ -14,7 +14,7 @@ path = "src/main.rs"
 [dependencies]
 byteorder = "1"
 bytes = "1.0.0"
-ckb-vm = { version = "0.20.0-rc1", features = ["detect-asm"] }
+ckb-vm = { version = "0.20.0-rc2", features = ["detect-asm"] }
 env_logger = "0.4.3"
 gdb-remote-protocol = { git = "https://github.com/luser/rust-gdb-remote-protocol", rev = "565ab0c" }
 libc = "0.2.47"
