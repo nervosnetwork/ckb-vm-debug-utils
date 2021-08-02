@@ -143,20 +143,20 @@ impl<'a> Handler for GdbHandler<'a> {
     }
 
     fn vcont(&self, request: Vec<(VCont, Option<ThreadId>)>) -> Result<StopReason, Error> {
-        let decoder = build_decoder::<u64>(self.machine.borrow().machine.isa());
+        let mut decoder = build_decoder::<u64>(self.machine.borrow().machine.isa());
         let (vcont, _thread_id) = &request[0];
         match vcont {
             VCont::Continue => {
                 self.machine
                     .borrow_mut()
                     .machine
-                    .step(&decoder)
+                    .step(&mut decoder)
                     .expect("VM error");
                 while (!self.at_breakpoint()) && self.machine.borrow().machine.running() {
                     self.machine
                         .borrow_mut()
                         .machine
-                        .step(&decoder)
+                        .step(&mut decoder)
                         .expect("VM error");
                 }
             }
@@ -165,7 +165,7 @@ impl<'a> Handler for GdbHandler<'a> {
                     self.machine
                         .borrow_mut()
                         .machine
-                        .step(&decoder)
+                        .step(&mut decoder)
                         .expect("VM error");
                 }
             }
@@ -173,7 +173,7 @@ impl<'a> Handler for GdbHandler<'a> {
                 self.machine
                     .borrow_mut()
                     .machine
-                    .step(&decoder)
+                    .step(&mut decoder)
                     .expect("VM error");
                 while self.machine.borrow().machine.pc() >= &range.start
                     && self.machine.borrow().machine.pc() < &range.end
@@ -183,7 +183,7 @@ impl<'a> Handler for GdbHandler<'a> {
                     self.machine
                         .borrow_mut()
                         .machine
-                        .step(&decoder)
+                        .step(&mut decoder)
                         .expect("VM error");
                 }
             }
