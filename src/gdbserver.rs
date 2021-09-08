@@ -143,7 +143,10 @@ impl<'a> Handler for GdbHandler<'a> {
     }
 
     fn vcont(&self, request: Vec<(VCont, Option<ThreadId>)>) -> Result<StopReason, Error> {
-        let mut decoder = build_decoder::<u64>(self.machine.borrow().machine.isa());
+        let mut decoder = build_decoder::<u64>(
+            self.machine.borrow().machine.isa(),
+            self.machine.borrow().machine.version(),
+        );
         let (vcont, _thread_id) = &request[0];
         match vcont {
             VCont::Continue => {
