@@ -44,9 +44,9 @@ impl WatchPointStatus {
         let result = if new_content == self.data {
             Ok(false)
         } else {
+            self.data = new_content;
             Ok(true)
         };
-        self.data = new_content;
         self.has_data = true;
 
         if has_data {
