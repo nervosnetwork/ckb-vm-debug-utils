@@ -207,9 +207,12 @@ impl<'a> Handler for GdbHandler<'a> {
                     .machine
                     .step(&mut decoder)
                     .expect("VM error");
-                while (!self.at_breakpoint() && !self.at_watchpoint()?)
-                    && self.machine.borrow().machine.running()
-                {
+                // at_watchpoint can't be in one expression with self.machine.borrow because
+                // it will borrow_mut `machine` inside
+                while (!self.at_breakpoint()) && self.machine.borrow().machine.running() {
+                    if self.at_watchpoint()? {
+                        break;
+                    }
                     self.machine
                         .borrow_mut()
                         .machine
@@ -234,9 +237,12 @@ impl<'a> Handler for GdbHandler<'a> {
                     .expect("VM error");
                 while self.machine.borrow().machine.pc() >= &range.start
                     && self.machine.borrow().machine.pc() < &range.end
-                    && (!self.at_breakpoint() && !self.at_watchpoint()?)
+                    && (!self.at_breakpoint())
                     && self.machine.borrow().machine.running()
                 {
+                    if !self.at_watchpoint()? {
+                        break;
+                    }
                     self.machine
                         .borrow_mut()
                         .machine
