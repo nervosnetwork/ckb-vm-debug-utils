@@ -240,7 +240,7 @@ impl<'a> Handler for GdbHandler<'a> {
                     && (!self.at_breakpoint())
                     && self.machine.borrow().machine.running()
                 {
-                    if !self.at_watchpoint()? {
+                    if self.at_watchpoint()? {
                         break;
                     }
                     self.machine
