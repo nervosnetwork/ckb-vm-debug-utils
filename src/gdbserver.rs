@@ -5,8 +5,9 @@ use ckb_vm::{
 };
 use gdb_remote_protocol::{
     Breakpoint, Error, Handler, MemoryRegion, ProcessType, StopReason, ThreadId, VCont,
-    VContFeature,
+    VContFeature, Watchpoint,
 };
+use log::debug;
 use std::borrow::Cow;
 use std::cell::RefCell;
 
@@ -16,9 +17,50 @@ fn format_register_value(v: u64) -> Vec<u8> {
     buf.to_vec()
 }
 
+pub struct WatchPointStatus {
+    pub watchpoint: Watchpoint,
+    pub data: Vec<u8>,
+    pub has_data: bool,
+}
+
+impl WatchPointStatus {
+    fn new(wp: Watchpoint) -> Self {
+        let mut data = Vec::<u8>::new();
+        data.resize(wp.n_bytes as usize, 0);
+        WatchPointStatus {
+            watchpoint: wp,
+            data,
+            has_data: false,
+        }
+    }
+    fn has_change<H: Handler>(&mut self, handler: &H) -> Result<bool, Error> {
+        let has_data = self.has_data;
+
+        let mem = MemoryRegion {
+            address: self.watchpoint.addr,
+            length: self.watchpoint.n_bytes,
+        };
+        let new_content = handler.read_memory(mem)?;
+        let result = if new_content == self.data {
+            Ok(false)
+        } else {
+            self.data = new_content;
+            Ok(true)
+        };
+        self.has_data = true;
+
+        if has_data {
+            result
+        } else {
+            Ok(false)
+        }
+    }
+}
+
 pub struct GdbHandler<'a> {
     machine: RefCell<AsmMachine<'a>>,
     breakpoints: RefCell<Vec<Breakpoint>>,
+    watchpoints: RefCell<Vec<WatchPointStatus>>,
 }
 
 impl<'a> GdbHandler<'a> {
@@ -26,11 +68,21 @@ impl<'a> GdbHandler<'a> {
         let pc = *self.machine.borrow().machine.pc();
         self.breakpoints.borrow().iter().any(|b| b.addr == pc)
     }
+    fn at_watchpoint(&self) -> Result<bool, Error> {
+        let mut result = false;
+        for wp in self.watchpoints.borrow_mut().iter_mut() {
+            if wp.has_change(self)? {
+                result = true;
+            }
+        }
+        Ok(result)
+    }
 
     pub fn new(machine: AsmMachine<'a>) -> Self {
         GdbHandler {
             machine: RefCell::new(machine),
             breakpoints: RefCell::new(vec![]),
+            watchpoints: RefCell::new(vec![]),
         }
     }
 }
@@ -155,7 +207,12 @@ impl<'a> Handler for GdbHandler<'a> {
                     .machine
                     .step(&mut decoder)
                     .expect("VM error");
+                // at_watchpoint can't be in one expression with self.machine.borrow because
+                // it will borrow_mut `machine` inside
                 while (!self.at_breakpoint()) && self.machine.borrow().machine.running() {
+                    if self.at_watchpoint()? {
+                        break;
+                    }
                     self.machine
                         .borrow_mut()
                         .machine
@@ -183,6 +240,9 @@ impl<'a> Handler for GdbHandler<'a> {
                     && (!self.at_breakpoint())
                     && self.machine.borrow().machine.running()
                 {
+                    if self.at_watchpoint()? {
+                        break;
+                    }
                     self.machine
                         .borrow_mut()
                         .machine
@@ -213,6 +273,26 @@ impl<'a> Handler for GdbHandler<'a> {
 
     fn remove_software_breakpoint(&self, breakpoint: Breakpoint) -> Result<(), Error> {
         self.breakpoints.borrow_mut().retain(|b| b != &breakpoint);
+        Ok(())
+    }
+
+    fn insert_write_watchpoint(&self, watchpoint: Watchpoint) -> Result<(), Error> {
+        let wp = WatchPointStatus::new(watchpoint);
+        self.watchpoints.borrow_mut().push(wp);
+        debug!(
+            "insert watch point at {:x} with length {}",
+            watchpoint.addr, watchpoint.n_bytes
+        );
+        Ok(())
+    }
+    fn remove_write_watchpoint(&self, wp: Watchpoint) -> Result<(), Error> {
+        self.watchpoints
+            .borrow_mut()
+            .retain(|b| b.watchpoint.addr != wp.addr || b.watchpoint.n_bytes != wp.n_bytes);
+        debug!(
+            "remove watch point at {:x} with length {}",
+            wp.addr, wp.n_bytes
+        );
         Ok(())
     }
 }
