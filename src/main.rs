@@ -3,8 +3,8 @@ extern crate log;
 
 use bytes::Bytes;
 use ckb_vm::{
-    machine::asm::{AsmCoreMachine, AsmMachine},
-    DefaultMachineBuilder, SupportMachine, ISA_B, ISA_IMC, ISA_MOP,
+    DefaultCoreMachine, DefaultMachineBuilder, SparseMemory, SupportMachine, WXorXMemory, ISA_B,
+    ISA_IMC, ISA_MOP,
 };
 use ckb_vm_debug_utils::{GdbHandler, Stdio};
 use gdb_remote_protocol::process_packets_from;
@@ -30,15 +30,18 @@ fn main() {
         debug!("Got connection");
         if let Ok(stream) = res {
             // TODO: vm version and isa should be configurable in the future.
-            let asm_core = AsmCoreMachine::new(ISA_IMC | ISA_B | ISA_MOP, 1, u64::max_value());
-            let core = DefaultMachineBuilder::<Box<AsmCoreMachine>>::new(asm_core)
+            let machine_core = DefaultCoreMachine::<u64, WXorXMemory<SparseMemory<u64>>>::new(
+                ISA_IMC | ISA_B | ISA_MOP,
+                1,
+                u64::max_value(),
+            );
+            let mut machine = DefaultMachineBuilder::new(machine_core)
                 .syscall(Box::new(Stdio::new(true)))
                 .build();
-            let mut machine = AsmMachine::new(core, None);
             machine
                 .load_program(&program, &program_args)
                 .expect("load program");
-            machine.machine.set_running(true);
+            machine.set_running(true);
             let h = GdbHandler::new(machine);
             process_packets_from(stream.try_clone().unwrap(), stream, h);
         }
