@@ -1,7 +1,7 @@
 use byteorder::{ByteOrder, LittleEndian};
 use ckb_vm::{
-    decoder::build_decoder, machine::asm::AsmMachine, CoreMachine, Memory, SupportMachine,
-    RISCV_GENERAL_REGISTER_NUMBER,
+    decoder::build_decoder, CoreMachine, DefaultCoreMachine, DefaultMachine, Memory, SparseMemory,
+    SupportMachine, WXorXMemory, RISCV_GENERAL_REGISTER_NUMBER,
 };
 use gdb_remote_protocol::{
     Breakpoint, Error, Handler, MemoryRegion, ProcessType, StopReason, ThreadId, VCont,
@@ -58,14 +58,14 @@ impl WatchPointStatus {
 }
 
 pub struct GdbHandler<'a> {
-    machine: RefCell<AsmMachine<'a>>,
+    machine: RefCell<DefaultMachine<'a, DefaultCoreMachine<u64, WXorXMemory<SparseMemory<u64>>>>>,
     breakpoints: RefCell<Vec<Breakpoint>>,
     watchpoints: RefCell<Vec<WatchPointStatus>>,
 }
 
 impl<'a> GdbHandler<'a> {
     fn at_breakpoint(&self) -> bool {
-        let pc = *self.machine.borrow().machine.pc();
+        let pc = *self.machine.borrow().pc();
         self.breakpoints.borrow().iter().any(|b| b.addr == pc)
     }
     fn at_watchpoint(&self) -> Result<bool, Error> {
@@ -78,7 +78,9 @@ impl<'a> GdbHandler<'a> {
         Ok(result)
     }
 
-    pub fn new(machine: AsmMachine<'a>) -> Self {
+    pub fn new(
+        machine: DefaultMachine<'a, DefaultCoreMachine<u64, WXorXMemory<SparseMemory<u64>>>>,
+    ) -> Self {
         GdbHandler {
             machine: RefCell::new(machine),
             breakpoints: RefCell::new(vec![]),
@@ -101,7 +103,6 @@ impl<'a> Handler for GdbHandler<'a> {
         let registers: Vec<Vec<u8>> = self
             .machine
             .borrow()
-            .machine
             .registers()
             .iter()
             .map(|v| format_register_value(*v))
@@ -113,10 +114,10 @@ impl<'a> Handler for GdbHandler<'a> {
         let register = register as usize;
         if register < RISCV_GENERAL_REGISTER_NUMBER {
             Ok(format_register_value(
-                self.machine.borrow().machine.registers()[register],
+                self.machine.borrow().registers()[register],
             ))
         } else if register == RISCV_GENERAL_REGISTER_NUMBER {
-            Ok(format_register_value(*self.machine.borrow().machine.pc()))
+            Ok(format_register_value(*self.machine.borrow().pc()))
         } else {
             Err(Error::Error(1))
         }
@@ -132,14 +133,11 @@ impl<'a> Handler for GdbHandler<'a> {
         let value = LittleEndian::read_u64(&buffer[..]);
         let register = register as usize;
         if register < RISCV_GENERAL_REGISTER_NUMBER {
-            self.machine
-                .borrow_mut()
-                .machine
-                .set_register(register, value);
+            self.machine.borrow_mut().set_register(register, value);
             Ok(())
         } else if register == RISCV_GENERAL_REGISTER_NUMBER {
-            self.machine.borrow_mut().machine.update_pc(value);
-            self.machine.borrow_mut().machine.commit_pc();
+            self.machine.borrow_mut().update_pc(value);
+            self.machine.borrow_mut().commit_pc();
             Ok(())
         } else {
             Err(Error::Error(2))
@@ -152,7 +150,6 @@ impl<'a> Handler for GdbHandler<'a> {
             let value = self
                 .machine
                 .borrow_mut()
-                .machine
                 .memory_mut()
                 .load8(&address)
                 .map_err(|e| {
@@ -167,7 +164,6 @@ impl<'a> Handler for GdbHandler<'a> {
     fn write_memory(&self, address: u64, bytes: &[u8]) -> Result<(), Error> {
         self.machine
             .borrow_mut()
-            .machine
             .memory_mut()
             .store_bytes(address, bytes)
             .map_err(|e| {
@@ -195,36 +191,31 @@ impl<'a> Handler for GdbHandler<'a> {
     }
 
     fn vcont(&self, request: Vec<(VCont, Option<ThreadId>)>) -> Result<StopReason, Error> {
-        let mut decoder = build_decoder::<u64>(
-            self.machine.borrow().machine.isa(),
-            self.machine.borrow().machine.version(),
-        );
+        let mut decoder =
+            build_decoder::<u64>(self.machine.borrow().isa(), self.machine.borrow().version());
         let (vcont, _thread_id) = &request[0];
         match vcont {
             VCont::Continue => {
                 self.machine
                     .borrow_mut()
-                    .machine
                     .step(&mut decoder)
                     .expect("VM error");
                 // at_watchpoint can't be in one expression with self.machine.borrow because
                 // it will borrow_mut `machine` inside
-                while (!self.at_breakpoint()) && self.machine.borrow().machine.running() {
+                while (!self.at_breakpoint()) && self.machine.borrow().running() {
                     if self.at_watchpoint()? {
                         break;
                     }
                     self.machine
                         .borrow_mut()
-                        .machine
                         .step(&mut decoder)
                         .expect("VM error");
                 }
             }
             VCont::Step => {
-                if self.machine.borrow().machine.running() {
+                if self.machine.borrow().running() {
                     self.machine
                         .borrow_mut()
-                        .machine
                         .step(&mut decoder)
                         .expect("VM error");
                 }
@@ -232,20 +223,18 @@ impl<'a> Handler for GdbHandler<'a> {
             VCont::RangeStep(range) => {
                 self.machine
                     .borrow_mut()
-                    .machine
                     .step(&mut decoder)
                     .expect("VM error");
-                while self.machine.borrow().machine.pc() >= &range.start
-                    && self.machine.borrow().machine.pc() < &range.end
+                while self.machine.borrow().pc() >= &range.start
+                    && self.machine.borrow().pc() < &range.end
                     && (!self.at_breakpoint())
-                    && self.machine.borrow().machine.running()
+                    && self.machine.borrow().running()
                 {
                     if self.at_watchpoint()? {
                         break;
                     }
                     self.machine
                         .borrow_mut()
-                        .machine
                         .step(&mut decoder)
                         .expect("VM error");
                 }
@@ -255,13 +244,13 @@ impl<'a> Handler for GdbHandler<'a> {
                 return Err(Error::Error(5));
             }
         }
-        if self.machine.borrow().machine.running() {
+        if self.machine.borrow().running() {
             // SIGTRAP
             Ok(StopReason::Signal(5))
         } else {
             Ok(StopReason::Exited(
                 0,
-                self.machine.borrow().machine.exit_code() as u8,
+                self.machine.borrow().exit_code() as u8,
             ))
         }
     }
