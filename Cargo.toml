@@ -9,14 +9,18 @@ autobins = false
 name = "baremetal"
 path = "src/main.rs"
 
+[features]
+default = []
+stdio = ["libc", "nix"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 byteorder = "1"
 bytes = "1.0.0"
-ckb-vm = { version = "0.20.1" }
+ckb-vm = { version = "0.21.1" }
 env_logger = "0.4.3"
 gdb-remote-protocol = { git = "https://github.com/luser/rust-gdb-remote-protocol", rev = "565ab0c" }
-libc = "0.2.47"
+libc = { version = "0.2.47", optional = true }
 log = "0.4.0"
-nix = "0.15.0"
+nix = { version = "0.15.0", optional = true }

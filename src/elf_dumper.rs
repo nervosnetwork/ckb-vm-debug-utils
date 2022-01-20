@@ -140,7 +140,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for ElfDumper {
         // There must be one page at least before the first segment, so we can
         // allocate code we need.
         if segments.is_empty() || segments[0].start <= RISCV_PAGESIZE as u64 {
-            return Err(Error::Unexpected);
+            return Err(Error::Unexpected("Unexpected segments".into()));
         }
 
         // Build instructions that restore register values
@@ -188,7 +188,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for ElfDumper {
         let jump_offset = machine.pc().to_u64() - jump_instruction_pc;
         let masked = jump_offset & 0xFFFFFFFFFFE00001;
         if masked != 0 && masked != 0xFFFFFFFFFFE00000 {
-            return Err(Error::Unexpected);
+            return Err(Error::Unexpected("Unexpected masked".into()));
         }
         let jump_instruction = 0b1101111
             | ((((jump_offset >> 12) & 0b_1111_1111) as u32) << 12)
