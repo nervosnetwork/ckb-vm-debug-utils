@@ -6,7 +6,9 @@ use ckb_vm::{
     DefaultCoreMachine, DefaultMachineBuilder, SparseMemory, SupportMachine, WXorXMemory, ISA_B,
     ISA_IMC, ISA_MOP,
 };
-use ckb_vm_debug_utils::{GdbHandler, Stdio};
+use ckb_vm_debug_utils::GdbHandler;
+#[cfg(feature = "stdio")]
+use ckb_vm_debug_utils::Stdio;
 use gdb_remote_protocol::process_packets_from;
 use std::env;
 use std::fs::File;
@@ -35,9 +37,11 @@ fn main() {
                 1,
                 u64::max_value(),
             );
-            let mut machine = DefaultMachineBuilder::new(machine_core)
-                .syscall(Box::new(Stdio::new(true)))
-                .build();
+            let machine_builder = DefaultMachineBuilder::new(machine_core);
+            #[cfg(feature = "stdio")]
+            let mut machine = machine_builder.syscall(Box::new(Stdio::new(true))).build();
+            #[cfg(not(feature = "stdio"))]
+            let mut machine = machine_builder.build();
             machine
                 .load_program(&program, &program_args)
                 .expect("load program");

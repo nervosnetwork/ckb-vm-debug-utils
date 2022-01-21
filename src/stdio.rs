@@ -103,7 +103,7 @@ impl Stdio {
             SEEK_SET => Whence::SeekSet,
             SEEK_CUR => Whence::SeekCur,
             SEEK_END => Whence::SeekEnd,
-            _ => return Err(Error::Unexpected),
+            _ => return Err(Error::Unexpected("Unexpected whence".into())),
         };
         let ret = lseek(fd, offset, whence).unwrap_or_else(|e| {
             debug!("lseek error: {:?}", e);
