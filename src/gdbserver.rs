@@ -1,8 +1,9 @@
 use byteorder::{ByteOrder, LittleEndian};
 use ckb_vm::{
-    decoder::build_decoder, CoreMachine, DefaultCoreMachine, DefaultMachine, Memory, SparseMemory,
-    SupportMachine, WXorXMemory, RISCV_GENERAL_REGISTER_NUMBER,
+    decoder::build_decoder, CoreMachine, DefaultCoreMachine, DefaultMachine, Error as CkbError,
+    Memory, SparseMemory, SupportMachine, WXorXMemory, RISCV_GENERAL_REGISTER_NUMBER,
 };
+
 use gdb_remote_protocol::{
     Breakpoint, Error, Handler, MemoryRegion, ProcessType, StopReason, ThreadId, VCont,
     VContFeature, Watchpoint,
@@ -10,6 +11,15 @@ use gdb_remote_protocol::{
 use log::debug;
 use std::borrow::Cow;
 use std::cell::RefCell;
+
+fn show_warning(e: &CkbError) {
+    println!(
+        "Fatal error in ckb-vm occurred: {:?}. Press Ctrl+C to quit or use gdb to attach it.",
+        e
+    );
+    println!("Note: it doesn't mean any coding error in ckb-vm.");
+    println!("This session can't be re-used. It is paused for post-mortem.")
+}
 
 fn format_register_value(v: u64) -> Vec<u8> {
     let mut buf = [0u8; 8];
@@ -196,35 +206,39 @@ impl<'a> Handler for GdbHandler<'a> {
         let (vcont, _thread_id) = &request[0];
         match vcont {
             VCont::Continue => {
-                self.machine
-                    .borrow_mut()
-                    .step(&mut decoder)
-                    .expect("VM error");
+                let res = self.machine.borrow_mut().step(&mut decoder);
+                if res.is_err() {
+                    show_warning(&res.err().unwrap());
+                    return Ok(StopReason::Signal(5));
+                }
                 // at_watchpoint can't be in one expression with self.machine.borrow because
                 // it will borrow_mut `machine` inside
                 while (!self.at_breakpoint()) && self.machine.borrow().running() {
                     if self.at_watchpoint()? {
                         break;
                     }
-                    self.machine
-                        .borrow_mut()
-                        .step(&mut decoder)
-                        .expect("VM error");
+                    let res = self.machine.borrow_mut().step(&mut decoder);
+                    if res.is_err() {
+                        show_warning(&res.err().unwrap());
+                        return Ok(StopReason::Signal(5));
+                    }
                 }
             }
             VCont::Step => {
                 if self.machine.borrow().running() {
-                    self.machine
-                        .borrow_mut()
-                        .step(&mut decoder)
-                        .expect("VM error");
+                    let res = self.machine.borrow_mut().step(&mut decoder);
+                    if res.is_err() {
+                        show_warning(&res.err().unwrap());
+                        return Ok(StopReason::Signal(5));
+                    }
                 }
             }
             VCont::RangeStep(range) => {
-                self.machine
-                    .borrow_mut()
-                    .step(&mut decoder)
-                    .expect("VM error");
+                let res = self.machine.borrow_mut().step(&mut decoder);
+                if res.is_err() {
+                    show_warning(&res.err().unwrap());
+                    return Ok(StopReason::Signal(5));
+                }
                 while self.machine.borrow().pc() >= &range.start
                     && self.machine.borrow().pc() < &range.end
                     && (!self.at_breakpoint())
@@ -233,10 +247,11 @@ impl<'a> Handler for GdbHandler<'a> {
                     if self.at_watchpoint()? {
                         break;
                     }
-                    self.machine
-                        .borrow_mut()
-                        .step(&mut decoder)
-                        .expect("VM error");
+                    let res = self.machine.borrow_mut().step(&mut decoder);
+                    if res.is_err() {
+                        show_warning(&res.err().unwrap());
+                        return Ok(StopReason::Signal(5));
+                    }
                 }
             }
             v => {
